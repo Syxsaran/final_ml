@@ -7,6 +7,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neural_network import MLPClassifier
 from sklearn.ensemble import VotingClassifier
+from sklearn.impute import SimpleImputer
 from PIL import Image, ImageTk
 import csv
 import os
@@ -17,19 +18,10 @@ class HeartDiseasePredictionApp:
         self.root.title("Predict heart disease")
         self.root.geometry("1400x720")
         self.widgets()
+        self.imputer = SimpleImputer(strategy='mean')
         self.fit()  # Fit the model when the app starts
 
         
-    def fit(self):
-        try:
-            X = [data[0:7] for data in self.data[1:]]  # Exclude header row
-            y = [data[7] for data in self.data[1:]]  # Target column
-            self.voting_classifier.fit(X, y)
-        except Exception as e:
-            print("Error:", e)
-
-
-    
 
     def widgets(self):
         greeting = tk.Label(self.root, text="Predict heart disease", fg="black", font=("Arial", 16))
@@ -39,7 +31,7 @@ class HeartDiseasePredictionApp:
         self.frame1.place(x=30, y=50)
 
         frame2 = tk.Frame(self.root, width=370, height=500, bg="#612180")
-        frame2.place(x=800, y=50)
+        frame2.place(x=900, y=50)
 
         frame2_text = tk.Label(frame2, text="INPUT", fg="white", font=("Arial", 20), bg="#612180")
         frame2_text.place(x=30, y=20)
@@ -58,6 +50,8 @@ class HeartDiseasePredictionApp:
 
             self.input_entries.append(entry)
 
+            
+
         frame3 = tk.Frame(self.root, width=1065, height=220, bg="#50E943")
         frame3.place(x=30, y=550)
 
@@ -73,23 +67,26 @@ class HeartDiseasePredictionApp:
         self.predict_label = tk.Label(frame4, text="Predict: unknown", font=("Arial", 22), bg="#FFFFFF", fg="black")
         self.predict_label.grid(row=0, column=2, pady=30, padx=30)
 
+        # กำหนดตัวประมาณการของคุณแยกต่างหาก
         rf_classifier = RandomForestClassifier()
-        lr_classifier = LogisticRegression()
+        lr_classifier = LogisticRegression(max_iter=1000)
         nb_classifier = GaussianNB()
         svm_classifier = SVC(probability=True)
         dt_classifier = DecisionTreeClassifier()
-        mlp_classifier = MLPClassifier()
-        adaboost_classifier = AdaBoostClassifier()
+        mlp_classifier = MLPClassifier(max_iter=500, solver='adam', learning_rate='adaptive')
+        adaboost_classifier = AdaBoostClassifier(algorithm='SAMME')
 
+        # ส่งตัวประมาณการไปยัง VotingClassifier
         classifiers = [('Random Forest', rf_classifier),
-                       ('Logistic Regression', lr_classifier),
-                       ('Naive Bayes', nb_classifier),
-                       ('SVM', svm_classifier),
-                       ('Decision Tree', dt_classifier),
-                       ('MLP', mlp_classifier),
-                       ('Adaboost', adaboost_classifier)]
-        
+                    ('Logistic Regression', lr_classifier),
+                    ('Naive Bayes', nb_classifier),
+                    ('SVM', svm_classifier),
+                    ('Decision Tree', dt_classifier),
+                    ('MLP', mlp_classifier),
+                    ('Adaboost', adaboost_classifier)]
+
         self.voting_classifier = VotingClassifier(estimators=classifiers, voting='soft')
+
 
         self.data = [
             ["Age", "Sex", "cp", "trestbps", "thalach", "exang", "slope", "target"],     
@@ -407,50 +404,84 @@ class HeartDiseasePredictionApp:
             self.load_data_from_csv(file_path)
 
         
+    def fit(self):
+        try:
+            X = []
+            y = []
+            for row in self.data[1:]:
+                # Convert non-numeric values to numeric representations
+                sex_map = {"ชาย": 1, "หญิง": 0}
+                cp_map = {"เจ็บแน่นทรวงอกปกติ": 0, "เจ็บแน่นทรวงอกไม่ปกติ": 1, "เจ็บไม่ใช่จากทรวงอก": 2, "ไม่มีอาการ": 3}
+                exang_map = {"เจ็บ": 1, "ไม่เจ็บ": 0}
+                slope_map = {"มาก": 0, "ปานกลาง": 1, "น้อย": 2}
+
+                # Map non-numeric values to numeric representations
+                sex = sex_map.get(row[1])
+                cp = cp_map.get(row[2])
+                exang = exang_map.get(row[5])
+                slope = slope_map.get(row[6])
+
+                # Append the data to X and y
+                X.append([row[0], sex, cp, row[3], row[4], exang, slope])
+                y.append(row[7])
+
+            # Impute missing values
+            X = self.imputer.fit_transform(X)
+
+            self.voting_classifier.fit(X, y)
+        except Exception as e:
+            print("Error occurred while fitting the classifier:", e)
+
+
+    
     def predict(self):
         try:
             data = []
             for i, entry in enumerate(self.input_entries):
                 entry_value = entry.get().strip()
-                print(f"Entry {i + 1}: {entry_value}")
-                
-                # Handle non-numeric 'Sex' field
-                if i == 1:
+                if entry_value == "":
+                    raise ValueError("Incomplete input data")
+
+                # Mapping categorical values to numeric representations
+                if i == 1:  
                     sex_map = {"ชาย": 1, "หญิง": 0}
-                    if entry_value in sex_map:
-                        data.append(sex_map[entry_value])
-                    else:
-                        raise ValueError(f"Invalid value in Entry {i + 1}.")
-                
-                # Handle non-numeric 'cp' field
-                elif i == 2:
-                    cp_map = {
-                        "ไม่มีอาการ": 0,
-                        "เจ็บไม่ใช่จากทรวงอก": 1,
-                        "เจ็บแน่นทรวงอกไม่ปกติ": 2,
-                        "เจ็บแน่นทรวงอกปกติ": 3
-                    }
-                    if entry_value in cp_map:
-                        data.append(cp_map[entry_value])
-                    else:
-                        raise ValueError(f"Invalid value in Entry {i + 1}.")
-                
-                # Convert numeric entries to float
-                elif entry_value.isdigit():
-                    data.append(float(entry_value))
+                    data.append(sex_map.get(entry_value))
+                elif i == 2:  
+                    cp_map = {"เจ็บแน่นทรวงอกปกติ": 0, "เจ็บแน่นทรวงอกไม่ปกติ": 1, "เจ็บไม่ใช่จากทรวงอก": 2, "ไม่มีอาการ": 3}
+                    data.append(cp_map.get(entry_value))
+                elif i == 5:  
+                    exang_map = {"เจ็บ": 1, "ไม่เจ็บ": 0}
+                    data.append(exang_map.get(entry_value))
+                elif i == 6:  
+                    slope_map = {"มาก": 0, "ปานกลาง": 1, "น้อย": 2}
+                    data.append(slope_map.get(entry_value))
                 else:
-                    raise ValueError(f"Non-numeric input detected in Entry {i + 1}.")
+                    data.append(float(entry_value))  
 
-            if len(data) == len(self.input_entries):
-                prediction = self.voting_classifier.predict([data])[0]
-                prediction_label = "Negative" if prediction == 0 else "Positive"
-                self.predict_label.config(text=f"Predict: {prediction_label}")
-            else:
-                raise ValueError("Incomplete input data.")
+            self.fit()  # Ensure that the model is fitted before prediction
 
-        except Exception as e:
-            print("Error:", e)
+            # Get the estimators from the voting classifier
+            estimators = self.voting_classifier.estimators_
+            
+            # Make predictions using each estimator
+            predictions = []
 
+            for estimator in estimators:
+                # Check if the estimator is a string, if so, skip it
+                if isinstance(estimator, str):
+                    continue
+                
+                prediction = estimator.predict([data])[0]
+                predictions.append(prediction)
+
+            # Calculate the majority vote
+            prediction = max(set(predictions), key=predictions.count)
+
+            prediction_label = "มีโรค" if prediction == 0 else "ไม่มีโรค"
+            self.predict_label.config(text=f"Predict: {prediction_label}")
+
+        except ValueError as ve:
+            print("Error:", ve)
 
 
 
@@ -460,28 +491,33 @@ class HeartDiseasePredictionApp:
         try:
             with open(csv_file, 'r') as file:
                 reader = csv.reader(file)
-                raw_data = [row for row in reader]  # อ่านข้อมูลจากไฟล์ CSV และเก็บไว้ในรูปของรายการข้อมูล
+                raw_data = [row for row in reader]  # Read data from CSV file
 
-            headers = raw_data[0]  # ใช้ข้อมูลบรรทัดแรกเป็นส่วนหัวของข้อมูล
+            headers = raw_data[0]  # Use the first row as headers
 
-            # แปลงข้อมูลจากสตริงเป็นตัวเลข และเก็บข้อมูลในรูปแบบที่เหมาะสมสำหรับการใช้งาน
+            # Convert data from string to appropriate types
             self.data = [headers] + [[int(cell) if i < 4 else float(cell) for i, cell in enumerate(row)] for row in raw_data[1:]]
 
-            self.update_frame1()  # อัปเดต Frame ใน GUI ด้วยข้อมูลที่โหลดเข้ามา
+            self.update_frame1()  # Update the frame in GUI with the loaded data
         except FileNotFoundError:
-            print(f"Error: CSV file '{csv_file}' not found.")  # แสดงข้อผิดพลาดเมื่อไม่พบไฟล์ CSV
+            print(f"Error: CSV file '{csv_file}' not found.")
 
     def update_frame1(self):
         for widget in self.frame1.winfo_children():
             widget.destroy()  # ลบวิดเจ็ตทั้งหมดออกจาก Frame ที่กำลังใช้งาน
 
-        # สร้าง Label สำหรับแสดงข้อมูลในแต่ละเซลล์ของตาราง
         for i, row in enumerate(self.data):
             for j, value in enumerate(row):
-                label = tk.Label(self.frame1, width=10, height=1, text=str(value), bg="#FFFFFF", fg="black")
+                if j == 2:  # ตรวจสอบว่าเรากำลังจัดการกับคอลัมน์ที่ 3 หรือไม่
+                    label_width = 20  # กำหนดความกว้างของ Label ในคอลัมน์ที่ 3
+                else:
+                    label_width = 10  # กำหนดความกว้างของ Label ในคอลัมน์อื่น ๆ
+                label = tk.Label(self.frame1, width=label_width, height=1, text=str(value), bg="#FFFFFF", fg="black")
                 label.grid(row=i, column=j, padx=10, pady=10)  # จัดวาง Label ในตำแหน่งที่เหมาะสมใน Frame
                 if i == 0:
                     label.configure(bg="#F1D3FF")  # ตั้งค่าสีพื้นหลังของ Label ในแถวแรกของตารางเป็นสีเทาอ่อน
+
+
 
 
 def main():
