@@ -19,7 +19,7 @@ class HeartDiseasePredictionApp:
         self.root.geometry("1400x720")
         self.widgets()
         self.imputer = SimpleImputer(strategy='mean')
-        self.fit()  # Fit the model when the app starts
+        self.fit()
 
         
 
@@ -68,15 +68,16 @@ class HeartDiseasePredictionApp:
         self.predict_label.grid(row=0, column=2, pady=30, padx=30)
 
         # กำหนดตัวประมาณการของคุณแยกต่างหาก
-        rf_classifier = RandomForestClassifier()
-        lr_classifier = LogisticRegression(max_iter=1000)
-        nb_classifier = GaussianNB()
-        svm_classifier = SVC(probability=True)
-        dt_classifier = DecisionTreeClassifier()
-        mlp_classifier = MLPClassifier(max_iter=500, solver='adam', learning_rate='adaptive')
-        adaboost_classifier = AdaBoostClassifier(algorithm='SAMME')
+        rf_classifier = RandomForestClassifier() #Random forest
+        lr_classifier = LogisticRegression(max_iter=1000) #Logistic regression
+        nb_classifier = GaussianNB() #Naive Bayes
+        svm_classifier = SVC(probability=True) #SVM
+        dt_classifier = DecisionTreeClassifier() #Deception tree
+        mlp_classifier = MLPClassifier(max_iter=500, solver='adam', learning_rate='adaptive') #Multiple Layer Perceptron (Deep learning)
+        adaboost_classifier = AdaBoostClassifier(algorithm='SAMME') #Adaboost
 
         # ส่งตัวประมาณการไปยัง VotingClassifier
+        #สร้าง Voting Classifier เพื่อรวมโมเดล
         classifiers = [('Random Forest', rf_classifier),
                     ('Logistic Regression', lr_classifier),
                     ('Naive Bayes', nb_classifier),
@@ -85,7 +86,8 @@ class HeartDiseasePredictionApp:
                     ('MLP', mlp_classifier),
                     ('Adaboost', adaboost_classifier)]
 
-        self.voting_classifier = VotingClassifier(estimators=classifiers, voting='soft')
+        self.voting_classifier = VotingClassifier(estimators=classifiers,
+                                                  voting='soft') #ความน่าจะเป็นของแต่ละโมเดล
 
 
         self.data = [
@@ -406,8 +408,8 @@ class HeartDiseasePredictionApp:
         
     def fit(self):
         try:
-            X = []
-            y = []
+            X = [] #เมทริกซ์ของข้อมูลเข้า
+            y = [] #เวกเตอร์ของค่าเป้าหมาย
             for row in self.data[1:]:
                 # Convert non-numeric values to numeric representations
                 sex_map = {"ชาย": 1, "หญิง": 0}
@@ -415,7 +417,7 @@ class HeartDiseasePredictionApp:
                 exang_map = {"เจ็บ": 1, "ไม่เจ็บ": 0}
                 slope_map = {"มาก": 0, "ปานกลาง": 1, "น้อย": 2}
 
-                # Map non-numeric values to numeric representations
+                # แมปข้อมูลที่ไม่ใช่ตัวเลขเพื่อแปลงค่าข้อความเป็นตัวเลข
                 sex = sex_map.get(row[1])
                 cp = cp_map.get(row[2])
                 exang = exang_map.get(row[5])
@@ -423,12 +425,12 @@ class HeartDiseasePredictionApp:
 
                 # Append the data to X and y
                 X.append([row[0], sex, cp, row[3], row[4], exang, slope])
-                y.append(row[7])
+                y.append(row[7]) #เวกเตอร์เป้าหมาย
 
-            # Impute missing values
+            # แทนค่าที่ขาดด้วยค่าเฉลี่ยของแต่ละคอลัมน์
             X = self.imputer.fit_transform(X)
 
-            self.voting_classifier.fit(X, y)
+            self.voting_classifier.fit(X, y) #ฝึกโมเดล
         except Exception as e:
             print("Error occurred while fitting the classifier:", e)
 
@@ -458,24 +460,25 @@ class HeartDiseasePredictionApp:
                 else:
                     data.append(float(entry_value))  
 
-            self.fit()  # Ensure that the model is fitted before prediction
+            self.fit()  # เทรนโมเดลก่อนทำการทำนาย
 
-            # Get the estimators from the voting classifier
+            # ดึงโมเดลเพื่อทำการทำนาย
             estimators = self.voting_classifier.estimators_
             
-            # Make predictions using each estimator
+            # สร้างรายการว่างเพื่อเก็บผลการทำนาย
             predictions = []
 
             for estimator in estimators:
-                # Check if the estimator is a string, if so, skip it
+                # ตรวจสอบว่าตัวประมาณค่าเป็นสตริงหรือไม่ หากใช่ ให้ข้ามไป
                 if isinstance(estimator, str):
                     continue
                 
-                prediction = estimator.predict([data])[0]
-                predictions.append(prediction)
+                prediction = estimator.predict([data])[0] #ทำนายผล data โดยใช้ estimator
+                predictions.append(prediction) # เพิ่มผลลัพธ์การทำนายลงในpredictions
 
-            # Calculate the majority vote
-            prediction = max(set(predictions), key=predictions.count)
+            # คำนวณผลการทำนาย
+            prediction = max(set(predictions),#หาค่าที่มีจำนวนมาก predictions
+                              key=predictions.count) #หาค่าที่มีจำนวนการปรากฏมากที่สุด
 
             prediction_label = "มีโรค" if prediction == 0 else "ไม่มีโรค"
             self.predict_label.config(text=f"Predict: {prediction_label}")
