@@ -16,12 +16,20 @@ class HeartDiseasePredictionApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Predict heart disease")
-        self.root.geometry("1400x720")
+        self.root.geometry("1980x1080")
         self.widgets()
         self.imputer = SimpleImputer(strategy='mean')
+        self.logistic_classifier = LogisticRegression(max_iter=1000)
+        self.naive_bayes_classifier = GaussianNB()
+        self.svm_classifier = SVC(probability=True)
+        self.decision_tree_classifier = DecisionTreeClassifier()
+        self.random_forest_classifier = RandomForestClassifier()
+        self.mlp_classifier = MLPClassifier(max_iter=500, solver='adam', learning_rate='adaptive')
+        self.adaboost_classifier = AdaBoostClassifier(algorithm='SAMME')
         self.fit()
 
-        
+
+    
 
     def widgets(self):
         greeting = tk.Label(self.root, text="Predict heart disease", fg="black", font=("Arial", 16))
@@ -66,6 +74,30 @@ class HeartDiseasePredictionApp:
 
         self.predict_label = tk.Label(frame4, text="Predict: unknown", font=("Arial", 22), bg="#FFFFFF", fg="black")
         self.predict_label.grid(row=0, column=2, pady=30, padx=30)
+
+        ##
+        self.logistic_label = tk.Label(text="Logistic Regression: unknown", font=("Arial", 10), bg="#FFFFFF", fg="black")
+        self.logistic_label.grid(row=1, column=0, pady=10, padx=1300)
+
+        self.naive_bayes_label = tk.Label(text="Naive Bayes: unknown", font=("Arial", 10), bg="#FFFFFF", fg="black")
+        self.naive_bayes_label.grid(row=2, column=0, pady=10, padx=10)
+
+        self.svm_label = tk.Label(text="SVM: unknown", font=("Arial", 10), bg="#FFFFFF", fg="black")
+        self.svm_label.grid(row=3, column=0, pady=10, padx=10)
+
+        self.decision_tree_label = tk.Label(text="Decision Tree: unknown", font=("Arial", 10), bg="#FFFFFF", fg="black")
+        self.decision_tree_label.grid(row=4, column=0, pady=10, padx=10)
+
+        self.random_forest_label = tk.Label(text="Random Forest: unknown", font=("Arial", 10), bg="#FFFFFF", fg="black")
+        self.random_forest_label.grid(row=5, column=0, pady=10, padx=10)
+
+        self.mlp_label = tk.Label(text="Multiple Layer Perceptron: unknown", font=("Arial", 10), bg="#FFFFFF", fg="black")
+        self.mlp_label.grid(row=6, column=0, pady=10, padx=10)
+
+        self.adaboost_label = tk.Label(text="Adaboost: unknown", font=("Arial", 10), bg="#FFFFFF", fg="black")
+        self.adaboost_label.grid(row=7, column=0, pady=10, padx=10)
+
+        ##
 
         # กำหนดตัวประมาณการของคุณแยกต่างหาก
         rf_classifier = RandomForestClassifier() #Random forest
@@ -399,17 +431,21 @@ class HeartDiseasePredictionApp:
 
         self.update_frame1()  # เรียกใช้เมธอดเพื่อแสดงข้อมูลในเฟรมแรก
 
+
     # เมธอดสำหรับเปิดไฟล์ CSV
     def open_file(self):
         file_path = filedialog.askopenfilename(filetypes=[("CSV files", "*.csv")])
         if file_path:
             self.load_data_from_csv(file_path)
 
+    
+
+
         
     def fit(self):
         try:
-            X = [] #เมทริกซ์ของข้อมูลเข้า
-            y = [] #เวกเตอร์ของค่าเป้าหมาย
+            X = []  # Feature matrix
+            y = []  # Target vector
             for row in self.data[1:]:
                 # Convert non-numeric values to numeric representations
                 sex_map = {"ชาย": 1, "หญิง": 0}
@@ -417,23 +453,69 @@ class HeartDiseasePredictionApp:
                 exang_map = {"เจ็บ": 1, "ไม่เจ็บ": 0}
                 slope_map = {"มาก": 0, "ปานกลาง": 1, "น้อย": 2}
 
-                # แมปข้อมูลที่ไม่ใช่ตัวเลขเพื่อแปลงค่าข้อความเป็นตัวเลข
+                # Map non-numeric data to numeric values
                 sex = sex_map.get(row[1])
                 cp = cp_map.get(row[2])
                 exang = exang_map.get(row[5])
                 slope = slope_map.get(row[6])
 
-                # Append the data to X and y
+                # Append data to X and y
                 X.append([row[0], sex, cp, row[3], row[4], exang, slope])
-                y.append(row[7]) #เวกเตอร์เป้าหมาย
+                y.append(row[7])  # Target vector
 
-            # แทนค่าที่ขาดด้วยค่าเฉลี่ยของแต่ละคอลัมน์
+            # Replace missing values with the mean of each column
             X = self.imputer.fit_transform(X)
 
-            self.voting_classifier.fit(X, y) #ฝึกโมเดล
-        except Exception as e:
-            print("Error occurred while fitting the classifier:", e)
+            # Fit individual classifiers
+            self.logistic_classifier.fit(X, y)
+            self.naive_bayes_classifier.fit(X, y)
+            self.svm_classifier.fit(X, y)
+            self.decision_tree_classifier.fit(X, y)
+            self.random_forest_classifier.fit(X, y)
+            self.mlp_classifier.fit(X, y)
+            self.adaboost_classifier.fit(X, y)
 
+            # Fit the voting classifier
+            classifiers = [
+                ('Random Forest', self.random_forest_classifier),
+                ('Logistic Regression', self.logistic_classifier),
+                ('Naive Bayes', self.naive_bayes_classifier),
+                ('SVM', self.svm_classifier),
+                ('Decision Tree', self.decision_tree_classifier),
+                ('MLP', self.mlp_classifier),
+                ('Adaboost', self.adaboost_classifier)
+            ]
+
+            self.voting_classifier = VotingClassifier(estimators=classifiers, voting='soft')
+            self.voting_classifier.fit(X, y)
+
+        except Exception as e:
+            print("Error occurred while fitting the classifiers:", e)
+
+    def predict_individual_models(self, data):
+        try:
+            # Predict using logistic regression
+            logistic_regression_prediction = self.logistic_classifier.predict([data])[0]
+
+            # Predict using other classifiers
+            naive_bayes_prediction = self.naive_bayes_classifier.predict([data])[0]
+            svm_prediction = self.svm_classifier.predict([data])[0]
+            decision_tree_prediction = self.decision_tree_classifier.predict([data])[0]
+            random_forest_prediction = self.random_forest_classifier.predict([data])[0]
+            mlp_prediction = self.mlp_classifier.predict([data])[0]
+            adaboost_prediction = self.adaboost_classifier.predict([data])[0]
+
+            # Update the labels with predictions
+            self.logistic_label.config(text=f"Logistic Regression: {logistic_regression_prediction}")
+            self.naive_bayes_label.config(text=f"Naive Bayes: {naive_bayes_prediction}")
+            self.svm_label.config(text=f"SVM: {svm_prediction}")
+            self.decision_tree_label.config(text=f"Decision Tree: {decision_tree_prediction}")
+            self.random_forest_label.config(text=f"Random Forest: {random_forest_prediction}")
+            self.mlp_label.config(text=f"Multiple Layer Perceptron: {mlp_prediction}")
+            self.adaboost_label.config(text=f"Adaboost: {adaboost_prediction}")
+
+        except Exception as e:
+            print("Error occurred while predicting individual models:", e)
 
     
     def predict(self):
@@ -445,26 +527,26 @@ class HeartDiseasePredictionApp:
                     raise ValueError("Incomplete input data")
 
                 # Mapping categorical values to numeric representations
-                if i == 1:  
+                if i == 1:
                     sex_map = {"ชาย": 1, "หญิง": 0}
                     data.append(sex_map.get(entry_value))
-                elif i == 2:  
+                elif i == 2:
                     cp_map = {"เจ็บแน่นทรวงอกปกติ": 0, "เจ็บแน่นทรวงอกไม่ปกติ": 1, "เจ็บไม่ใช่จากทรวงอก": 2, "ไม่มีอาการ": 3}
                     data.append(cp_map.get(entry_value))
-                elif i == 5:  
+                elif i == 5:
                     exang_map = {"เจ็บ": 1, "ไม่เจ็บ": 0}
                     data.append(exang_map.get(entry_value))
-                elif i == 6:  
+                elif i == 6:
                     slope_map = {"มาก": 0, "ปานกลาง": 1, "น้อย": 2}
                     data.append(slope_map.get(entry_value))
                 else:
-                    data.append(float(entry_value))  
+                    data.append(float(entry_value))
 
-            self.fit()  # เทรนโมเดลก่อนทำการทำนาย
+            self.predict_individual_models(data)  # Call the method to predict using individual classifiers
 
             # ดึงโมเดลเพื่อทำการทำนาย
             estimators = self.voting_classifier.estimators_
-            
+
             # สร้างรายการว่างเพื่อเก็บผลการทำนาย
             predictions = []
 
@@ -472,19 +554,20 @@ class HeartDiseasePredictionApp:
                 # ตรวจสอบว่าตัวประมาณค่าเป็นสตริงหรือไม่ หากใช่ ให้ข้ามไป
                 if isinstance(estimator, str):
                     continue
-                
-                prediction = estimator.predict([data])[0] #ทำนายผล data โดยใช้ estimator
-                predictions.append(prediction) # เพิ่มผลลัพธ์การทำนายลงในpredictions
+
+                prediction = estimator.predict([data])[0]  # ทำนายผล data โดยใช้ estimator
+                predictions.append(prediction)  # เพิ่มผลลัพธ์การทำนายลงใน predictions
 
             # คำนวณผลการทำนาย
-            prediction = max(set(predictions),#หาค่าที่มีจำนวนมาก predictions
-                              key=predictions.count) #หาค่าที่มีจำนวนการปรากฏมากที่สุด
+            prediction = max(set(predictions),  # หาค่าที่มีจำนวนมาก predictions
+                            key=predictions.count)  # หาค่าที่มีจำนวนการปรากฏมากที่สุด
 
             prediction_label = "มีโรค" if prediction == 0 else "ไม่มีโรค"
             self.predict_label.config(text=f"Predict: {prediction_label}")
 
         except ValueError as ve:
             print("Error:", ve)
+
 
 
 
